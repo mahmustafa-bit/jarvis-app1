@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#030712" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>J.A.R.V.I.S. MARK X // STARK OS</title>
+
+  <!-- PWA Manifest Bağlantısı (PWABuilder / APK Uyumlu) -->
+  <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{
+    "name": "JARVIS Assistant",
+    "short_name": "JARVIS",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#02060d",
+    "theme_color": "#02060d",
+    "icons": [
+      {
+        "src": "https://img.icons8.com/ios-filled/512/00e5ff/iron-man.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }'>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --theme-primary: #00e5ff;
+      --theme-secondary: #0066ff;
+      --theme-glow: rgba(0, 229, 255, 0.45);
+      --theme-soft: rgba(0, 229, 255, 0.1);
+      --theme-border: rgba(0, 229, 255, 0.35);
+      --bg-dark: #02060d;
+    }
+
+    body.user-mode {
+      --theme-primary: #ff6b00;
+      --theme-secondary: #ffaa00;
+      --theme-glow: rgba(255, 107, 0, 0.55);
+      --theme-soft: rgba(255, 107, 0, 0.12);
+      --theme-border: rgba(255, 107, 0, 0.45);
+    }
+
+    body.jarvis-mode {
+      --theme-primary: #00e5ff;
+      --theme-secondary: #0077ff;
+      --theme-glow: rgba(0, 229, 255, 0.5);
+      --theme-soft: rgba(0, 229, 255, 0.12);
+      --theme-border: rgba(0, 229, 255, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-dark);
+      color: #e2f1ff;
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100vw;
+      transition: background-color 0.35s ease;
+    }
+
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .font-mono-tech { font-family: 'JetBrains Mono', monospace; }
+
+    .hud-grid {
+      background-image:
+        radial-gradient(circle at 50% 38%, var(--theme-soft) 0%, transparent 60%),
+        linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 100% 100%, 28px 28px, 28px 28px;
+      transition: all 0.35s ease;
+    }
+
+    .hud-panel {
+      background: rgba(6, 13, 26, 0.78);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--theme-border);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.7), inset 0 0 12px var(--theme-soft);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .theme-text {
+      color: var(--theme-primary);
+      text-shadow: 0 0 10px var(--theme-glow);
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+
+    .theme-border {
+      border-color: var(--theme-border);
+      transition: border-color 0.3s ease;
+    }
+
+    .theme-btn {
+      background: var(--theme-soft);
+      border: 1px solid var(--theme-border);
+      color: var(--theme-primary);
+      transition: all 0.25s ease;
+    }
+    .theme-btn:active {
+      transform: scale(0.95);
+      background: var(--theme-primary);
+      color: #000;
+    }
+
+    .corner-bracket {
+      position: relative;
+    }
+    .corner-bracket::before,
+    .corner-bracket::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: var(--theme-primary);
+      pointer-events: none;
+      transition: border-color 0.3s ease;
+    }
+    .corner-bracket::before {
+      top: -1px; left: -1px;
+      border-top: 2px solid var(--theme-primary);
+      border-left: 2px solid var(--theme-primary);
+    }
+    .corner-bracket::after {
+      bottom: -1px; right: -1px;
+      border-bottom: 2px solid var(--theme-primary);
+      border-right: 2px solid var(--theme-primary);
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--theme-border); border-radius: 99px; }
+
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(1000%); }
+    }
+    .scanline-bar {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--theme-primary), transparent);
+      opacity: 0.25;
+      animation: scanline 6s linear infinite;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="jarvis-mode hud-grid flex flex-col justify-between relative select-none">
+
+  <div class="scanline-bar"></div>
+
+  <!-- ÜST TELEMETRİ & DURUM BARI -->
+  <header class="w-full px-3 pt-2 pb-1.5 z-20 flex items-center justify-between border-b border-white/10 bg-black/50 backdrop-blur-md">
+    <div class="flex items-center gap-2.5">
+      <div id="statusDot" class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#00e5ff] transition-all duration-300"></div>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <h1 class="font-orbitron font-black text-sm tracking-widest theme-text">J.A.R.V.I.S.</h1>
+          <span class="text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">MK-X</span>
+        </div>
+        <p id="systemStateText" class="text-[11px] font-mono-tech text-slate-400 tracking-wider">SİSTEM ÇEVRİMİÇİ // HAZIR</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5">
+      <button id="wakeWordBtn" onclick="toggleWakeWord()" class="theme-btn px-2.5 py-1 rounded text-[11px] font-mono-tech font-semibold flex items-center gap-1">
+        <span id="wakeDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="wakeLabel">"JARVIS": AÇIK</span>
+      </button>
+
+      <button onclick="openModal('contactsModal')" class="hud-panel px-2.5 py-1 rounded text-[11px] font-semibold text-slate-200 hover:text-white">
+        REHBER
+      </button>
+
+      <button onclick="openModal('memoryModal')" class="hud-panel px-2.5 py-1 rounded text-[11px] font-semibold text-slate-200 hover:text-white">
+        HAFIZA
+      </button>
+
+      <button onclick="openModal('settingsModal')" class="hud-panel p-1.5 rounded text-slate-300 hover:text-white" title="Sistem Ayarları">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- CANLI TELEMETRİ ŞERİDİ -->
+  <div class="w-full px-3 py-1 bg-black/30 border-b border-white/5 flex items-center justify-between text-[11px] font-mono-tech text-slate-400 z-10">
+    <div class="flex items-center gap-3">
+      <span>PİL: <strong id="hudBattery" class="theme-text">--%</strong></span>
+      <span>HAFIZA: <strong id="hudMemoryCount" class="theme-text">0</strong> KAYIT</span>
+      <span>GECİKME: <strong id="hudLatency" class="text-emerald-400">18ms</strong></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="hudModeBadge" class="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">MAVİ: JARVIS MODU</span>
+      <span id="hudClock" class="text-slate-200 font-bold">--:--:--</span>
+    </div>
+  </div>
+
+  <!-- ANA MERKEZ: HOLOGRAFİK ARK REAKTÖRÜ + SOHBET AKIŞI -->
+  <main class="flex-1 flex flex-col items-center justify-between overflow-hidden relative px-3 py-2">
+
+    <div class="relative flex flex-col items-center justify-center my-1 shrink-0">
+      <div class="relative w-48 h-48 sm:w-56 sm:h-56 flex items-center justify-center cursor-pointer" onclick="triggerManualListen()">
+        <canvas id="reactorCanvas" width="320" height="320" class="w-full h-full"></canvas>
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span id="coreCenterLabel" class="font-orbitron text-[11px] font-bold tracking-widest theme-text">J.A.R.V.I.S.</span>
+          <span id="coreSubLabel" class="font-mono-tech text-[9px] text-slate-300 mt-0.5">DOKUN VEYA KONUŞ</span>
+        </div>
+      </div>
+
+      <div id="liveTranscriptBox" class="hud-panel corner-bracket px-3.5 py-1.5 rounded-lg max-w-md w-full text-center min-h-[34px] flex items-center justify-center">
+        <p id="liveTranscript" class="text-xs sm:text-sm font-medium text-slate-200 truncate">
+          "Jarvis" diyerek veya küreye dokunarak emir verebilirsiniz efendim.
+        </p>
+      </div>
+    </div>
+
+    <!-- SESLİ MESAJ KAYIT PANELİ -->
+    <div id="voiceNoteRecorderBar" class="hidden w-full max-w-lg hud-panel border-orange-500/70 bg-orange-950/30 p-3 rounded-xl mb-2 flex items-center justify-between animate-pulse">
+      <div class="flex items-center gap-2.5">
+        <div class="w-3.5 h-3.5 rounded-full bg-orange-500 animate-ping"></div>
+        <div>
+          <p id="voiceNoteTargetText" class="text-xs font-bold text-orange-300">SESLİ MESAJ KAYDEDİLİYOR...</p>
+          <p id="voiceNoteTimer" class="text-[11px] font-mono-tech text-orange-200">00:00 // Konuşmanız bitince gönder'e basın</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="finishAndSendVoiceNote()" class="px-3 py-1.5 rounded-lg bg-orange-500 text-black font-bold text-xs shadow-lg">GÖNDER</button>
+        <button onclick="cancelVoiceNote()" class="px-2.5 py-1.5 rounded-lg bg-white/10 text-slate-300 text-xs">İPTAL</button>
+      </div>
+    </div>
+
+    <!-- HIZLI AKSİYON KARTI -->
+    <div id="quickActionCard" class="hidden w-full max-w-lg hud-panel corner-bracket p-2.5 rounded-xl mb-2 flex items-center justify-between">
+      <div class="flex items-center gap-2.5 overflow-hidden">
+        <div id="quickActionIcon" class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-base shrink-0">⚡</div>
+        <div class="overflow-hidden">
+          <p id="quickActionTitle" class="text-xs font-bold theme-text truncate">KOMUT YÜRÜTÜLÜYOR</p>
+          <p id="quickActionSub" class="text-[11px] text-slate-300 truncate"></p>
+        </div>
+      </div>
+      <a id="quickActionLink" href="#" class="px-3 py-1.5 rounded-lg bg-cyan-400 text-black font-bold text-xs shrink-0 ml-2">ÇALIŞTIR</a>
+    </div>
+
+    <div id="chatContainer" class="w-full max-w-lg flex-1 overflow-y-auto space-y-2 pr-1 py-1 select-text"></div>
+
+  </main>
+
+  <!-- ALT KONTROL PANELİ -->
+  <footer class="w-full max-w-lg mx-auto px-3 pb-2.5 pt-1 z-20">
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar text-[11px] font-mono-tech">
+      <button onclick="runCommandText('Spotify aç')" class="hud-panel px-2.5 py-1 rounded-full shrink-0 hover:border-cyan-400">🎵 Spotify Aç</button>
+      <button onclick="runCommandText('Instagram aç')" class="hud-panel px-2.5 py-1 rounded-full shrink-0 hover:border-cyan-400">📸 Instagram</button>
+      <button onclick="startVoiceNoteFlow('Seçilecek Kişi')" class="hud-panel px-2.5 py-1 rounded-full shrink-0 hover:border-orange-400">🎙️ Sesli Mesaj Gönder</button>
+      <button onclick="runCommandText('08:00 alarm kur')" class="hud-panel px-2.5 py-1 rounded-full shrink-0 hover:border-cyan-400">⏰ Alarm Kur</button>
+      <button onclick="runCommandText('Geçmişte ne konuşmuştuk?')" class="hud-panel px-2.5 py-1 rounded-full shrink-0 hover:border-cyan-400">🧠 Hafızayı Tara</button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="micMainBtn" onclick="triggerManualListen()" class="w-11 h-11 rounded-xl theme-btn flex items-center justify-center shrink-0 shadow-lg">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+      </button>
+
+      <input id="commandInput" type="text" placeholder="Jarvis'e emir verin (Örn: Ahmet'i ara, WhatsApp'tan yaz)..." class="flex-1 h-11 hud-panel rounded-xl px-3.5 text-sm text-white placeholder-slate-500 focus:outline-none" onkeydown="if(event.key==='Enter') submitTextCommand()" />
+
+      <button onclick="submitTextCommand()" class="h-11 px-4 rounded-xl theme-btn font-orbitron font-bold text-xs tracking-wider shrink-0">GÖNDER</button>
+    </div>
+  </footer>
+
+  <!-- MODALLAR -->
+  <div id="contactsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-panel corner-bracket w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2">
+        <h2 class="font-orbitron font-bold text-sm theme-text">TELEFON REHBERİ YETKİSİ</h2>
+        <button onclick="closeModal('contactsModal')" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+      <button onclick="importDeviceContacts()" class="w-full py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400 text-cyan-300 font-bold text-xs flex items-center justify-center gap-2">📱 KİŞİLERİ AKTAR (ANDROID)</button>
+      <div class="flex gap-2">
+        <input id="newContactName" type="text" placeholder="İsim" class="w-1/2 hud-panel rounded-lg px-2.5 py-2 text-xs text-white" />
+        <input id="newContactPhone" type="tel" placeholder="05xxxxxxxxx" class="w-1/2 hud-panel rounded-lg px-2.5 py-2 text-xs text-white" />
+        <button onclick="addManualContact()" class="px-3 py-2 rounded-lg theme-btn text-xs font-bold">EKLE</button>
+      </div>
+      <div id="contactsList" class="flex-1 overflow-y-auto space-y-1.5 pr-1"></div>
+    </div>
+  </div>
+
+  <div id="memoryModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-panel corner-bracket w-full max-w-md rounded-2xl p-4 space-y-3 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2">
+        <h2 class="font-orbitron font-bold text-sm theme-text">NÖRAL HAFIZA BANKASI</h2>
+        <button onclick="closeModal('memoryModal')" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+      <div class="flex gap-2">
+        <input id="newMemoryFact" type="text" placeholder="Unutulmaması gereken bilgi..." class="flex-1 hud-panel rounded-lg px-2.5 py-2 text-xs text-white" />
+        <button onclick="addManualMemory()" class="px-3 py-2 rounded-lg theme-btn text-xs font-bold">KAYDET</button>
+      </div>
+      <div id="memoryFactsList" class="flex-1 overflow-y-auto space-y-1.5 pr-1 text-xs"></div>
+      <button onclick="wipeAllMemory()" class="text-xs text-red-400 pt-2 border-t border-white/10">Tüm Hafızayı Sıfırla</button>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="hud-panel corner-bracket w-full max-w-md rounded-2xl p-4 space-y-3">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2">
+        <h2 class="font-orbitron font-bold text-sm theme-text">SİSTEM AYARLARI</h2>
+        <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+      <input id="apiKeyInput" type="password" placeholder="Gemini API Anahtarınız (AIzaSy...)" class="w-full hud-panel rounded-lg px-3 py-2 text-xs text-white font-mono-tech" />
+      <button onclick="saveSettings(); closeModal('settingsModal')" class="w-full py-2.5 rounded-xl theme-btn font-orbitron font-bold text-xs">KAYDET</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEYS = {
+      API_KEY: 'jarvis_mk10_api_key',
+      CONTACTS: 'jarvis_mk10_contacts',
+      MEMORY_FACTS: 'jarvis_mk10_facts',
+      CHAT_ARCHIVE: 'jarvis_mk10_chat_archive',
+      ALARMS: 'jarvis_mk10_alarms',
+      SETTINGS: 'jarvis_mk10_settings'
+    };
+
+    let state = {
+      mode: 'jarvis',
+      isListening: false,
+      isSpeaking: false,
+      wakeWordActive: true,
+      speechGenId: 0,
+      audioLevel: 0.08,
+      apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || '',
+      contacts: JSON.parse(localStorage.getItem(STORAGE_KEYS.CONTACTS) || '{"annem":"05000000000"}'),
+      memoryFacts: JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMORY_FACTS) || '["Kullanıcıya efendim denilecek."]'),
+      chatArchive: JSON.parse(localStorage.getItem(STORAGE_KEYS.CHAT_ARCHIVE) || '[]'),
+      alarms: JSON.parse(localStorage.getItem(STORAGE_KEYS.ALARMS) || '[]'),
+      settings: JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{"rate":1.12,"pitch":0.92}')
+    };
+
+    const ANDROID_APPS = {
+      'whatsapp': { name: 'WhatsApp', pkg: 'com.whatsapp', url: 'whatsapp://send' },
+      'instagram': { name: 'Instagram', pkg: 'com.instagram.android', url: 'instagram://app' },
+      'spotify': { name: 'Spotify', pkg: 'com.spotify.music', url: 'spotify://' },
+      'youtube': { name: 'YouTube', pkg: 'com.google.android.youtube', url: 'vnd.youtube://' },
+      'ayarlar': { name: 'Ayarlar', pkg: 'com.android.settings', url: 'intent:#Intent;action=android.settings.SETTINGS;end' },
+      'kamera': { name: 'Kamera', pkg: 'com.android.camera', url: 'intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end' }
+    };
+
+    function setVisualMode(mode, statusText = '') {
+      state.mode = mode;
+      const body = document.body;
+      const dot = document.getElementById('statusDot');
+      const badge = document.getElementById('hudModeBadge');
+      const coreLabel = document.getElementById('coreCenterLabel');
+      const sysText = document.getElementById('systemStateText');
+
+      if (mode === 'user') {
+        body.classList.remove('jarvis-mode'); body.classList.add('user-mode');
+        dot.className = 'w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_14px_#ff6b00] animate-ping';
+        badge.className = 'px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-300 border border-orange-500/40';
+        badge.textContent = 'TURUNCU: SİZ KONUŞUYORSUNUZ';
+        coreLabel.textContent = 'DİNLİYORUM';
+        sysText.textContent = statusText || 'SES ALGILAMA AKTİF';
+      } else {
+        body.classList.remove('user-mode'); body.classList.add('jarvis-mode');
+        dot.className = 'w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#00e5ff]';
+        badge.className = 'px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+        badge.textContent = 'MAVİ: J.A.R.V.I.S. AKTİF';
+        coreLabel.textContent = 'J.A.R.V.I.S.';
+        sysText.textContent = statusText || 'SİSTEM ÇEVRİMİÇİ';
+      }
+    }
+
+    const canvas = document.getElementById('reactorCanvas');
+    const ctx = canvas.getContext('2d');
+    let angle1 = 0, angle2 = 0, angle3 = 0, currentRGB = { r: 0, g: 229, b: 255 };
+
+    function animateReactor() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2, cy = canvas.height / 2;
+      const targetRGB = state.mode === 'user' ? { r: 255, g: 107, b: 0 } : { r: 0, g: 229, b: 255 };
+      currentRGB.r += (targetRGB.r - currentRGB.r) * 0.12;
+      currentRGB.g += (targetRGB.g - currentRGB.g) * 0.12;
+      currentRGB.b += (targetRGB.b - currentRGB.b) * 0.12;
+      const rgbStr = `${Math.round(currentRGB.r)}, ${Math.round(currentRGB.g)}, ${Math.round(currentRGB.b)}`;
+
+      state.audioLevel = (state.isSpeaking || state.isListening) ? 0.6 : 0.08;
+
+      ctx.strokeStyle = `rgba(${rgbStr}, 0.8)`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, 75 + state.audioLevel * 20, 0, Math.PI * 2); ctx.stroke();
+      requestAnimationFrame(animateReactor);
+    }
+    requestAnimationFrame(animateReactor);
+
+    let selectedTurkishVoice = null;
+    function loadTurkishVoice() {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      selectedTurkishVoice = voices.find(v => v.lang.includes('tr')) || voices[0];
+    }
+    if ('speechSynthesis' in window) { loadTurkishVoice(); window.speechSynthesis.onvoiceschanged = loadTurkishVoice; }
+
+    function stopAllSpeech() {
+      state.speechGenId++;
+      state.isSpeaking = false;
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+
+    function speakJarvis(text) {
+      stopAllSpeech();
+      state.isSpeaking = true;
+      setVisualMode('jarvis', 'J.A.R.V.I.S. KONUŞUYOR');
+      const utter = new SpeechSynthesisUtterance(text.replace(/[*#_`~]/g, ''));
+      if (selectedTurkishVoice) utter.voice = selectedTurkishVoice;
+      utter.lang = 'tr-TR'; utter.rate = 1.1;
+      utter.onend = () => { state.isSpeaking = false; setVisualMode('jarvis', 'HAZIR'); };
+      window.speechSynthesis.speak(utter);
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let manualCommandMode = false;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'tr-TR'; recognition.continuous = true; recognition.interimResults = true;
+      recognition.onresult = (e) => {
+        let finalTxt = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalTxt += e.results[i][0].transcript;
+        }
+        if (finalTxt) {
+          const raw = finalTxt.trim();
+          if (manualCommandMode) {
+            manualCommandMode = false;
+            runCommandText(raw);
+          } else if (state.wakeWordActive && raw.toLowerCase().includes('jarvis')) {
+            const cmd = raw.replace(/.*?jarvis[\s,.!]*/i, '').trim();
+            if (cmd.length > 1) runCommandText(cmd);
+            else { manualCommandMode = true; setVisualMode('user', 'DİNLİYORUM'); speakJarvis('Dinliyorum.'); }
+          }
+        }
+      };
+      recognition.onend = () => { if (state.wakeWordActive) { try { recognition.start(); } catch(e){} } };
+    }
+
+    function triggerManualListen() {
+      stopAllSpeech();
+      manualCommandMode = true;
+      setVisualMode('user', 'DİNLİYORUM...');
+      if (recognition) { try { recognition.start(); } catch(e){} }
+    }
+
+    function toggleWakeWord() {
+      state.wakeWordActive = !state.wakeWordActive;
+      document.getElementById('wakeLabel').textContent = state.wakeWordActive ? '"JARVIS": AÇIK' : '"JARVIS": KAPALI';
+    }
+
+    function showQuickAction(icon, title, sub, href) {
+      const card = document.getElementById('quickActionCard');
+      document.getElementById('quickActionIcon').textContent = icon;
+      document.getElementById('quickActionTitle').textContent = title;
+      document.getElementById('quickActionSub').textContent = sub;
+      document.getElementById('quickActionLink').href = href;
+      card.classList.remove('hidden');
+      if (href && href !== '#') { setTimeout(() => { window.location.href = href; }, 350); }
+    }
+
+    function runCommandText(text) {
+      appendMessage('user', text);
+      const lower = text.toLowerCase();
+
+      if (/\bara\b/.test(lower) && !lower.includes('youtube')) {
+        const person = lower.replace(/\bara\b/g, '').trim();
+        const phone = state.contacts[person] || person;
+        speakJarvis(`${person} aranıyor.`);
+        showQuickAction('📞', `${person.toUpperCase()} ARANIYOR`, phone, `tel:${phone}`);
+        return;
+      }
+
+      if (lower.includes('aç')) {
+        for (const [key, app] of Object.entries(ANDROID_APPS)) {
+          if (lower.includes(key)) {
+            speakJarvis(`${app.name} açılıyor.`);
+            showQuickAction('🚀', `${app.name} AÇILIYOR`, app.pkg, app.url);
+            return;
+          }
+        }
+      }
+
+      speakJarvis('Emriniz alındı efendim.');
+      appendMessage('jarvis', `Emriniz işlendi: ${text}`);
+    }
+
+    function appendMessage(sender, text) {
+      const box = document.getElementById('chatContainer');
+      const div = document.createElement('div');
+      div.className = `flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'}`;
+      div.innerHTML = `<div class="max-w-[85%] rounded-xl px-3 py-2 text-xs ${sender === 'user' ? 'bg-orange-500/20 text-orange-100' : 'hud-panel text-cyan-50'}">${text}</div>`;
+      box.appendChild(div); box.scrollTop = box.scrollHeight;
+    }
+
+    function submitTextCommand() {
+      const input = document.getElementById('commandInput');
+      if (!input.value.trim()) return;
+      runCommandText(input.value);
+      input.value = '';
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function addManualContact() {
+      const n = document.getElementById('newContactName').value.trim().toLowerCase();
+      const p = document.getElementById('newContactPhone').value.trim();
+      if (n && p) { state.contacts[n] = p; localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(state.contacts)); alert('Kişi eklendi.'); }
+    }
+    function saveSettings() {
+      const k = document.getElementById('apiKeyInput').value.trim();
+      if (k) { state.apiKey = k; localStorage.setItem(STORAGE_KEYS.API_KEY, k); alert('API Kaydedildi.'); }
+    }
+
+    window.addEventListener('load', () => {
+      appendMessage('jarvis', 'J.A.R.V.I.S. Mark X aktif. Emrinizi bekliyorum efendim.');
+      try { if (recognition) recognition.start(); } catch(e){}
+    });
+  </script>
+</body>
+</html>
