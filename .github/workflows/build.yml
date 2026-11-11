@@ -14,13 +14,15 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install PWABuilder CLI
-        run: npm install -g @pwabuilder/cli
+      - name: Install PWABuilder CLI Locally
+        run: |
+          npm init -y
+          npm install @pwabuilder/cli
 
       - name: Generate Package
         run: |
           mkdir -p output
-          pwabuilder package --webManifest ./index.html --name "JARVIS" --packageId "com.stark.jarvis" --version "1.0.0" --dir ./output || echo "Done"
+          npx pwabuilder package --webManifest ./index.html --name "JARVIS" --packageId "com.stark.jarvis" --version "1.0.0" --dir ./output || echo "Done"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
