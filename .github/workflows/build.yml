@@ -64,8 +64,8 @@ jobs:
                   applicationId "com.stark.jarvis"
                   minSdk 24
                   targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode 2
+                  versionName "2.0"
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -83,6 +83,14 @@ jobs:
               <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
               <uses-permission android:name="android.permission.VIBRATE" />
               <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+              <queries>
+                  <intent>
+                      <action android:name="android.speech.RecognitionService" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.TTS_SERVICE" />
+                  </intent>
+              </queries>
               <application
                   android:label="J.A.R.V.I.S."
                   android:usesCleartextTraffic="true"
@@ -108,19 +116,37 @@ jobs:
           import android.content.pm.PackageManager;
           import android.net.Uri;
           import android.os.Bundle;
+          import android.speech.RecognitionListener;
+          import android.speech.RecognizerIntent;
+          import android.speech.SpeechRecognizer;
+          import android.speech.tts.TextToSpeech;
+          import android.webkit.JavascriptInterface;
           import android.webkit.PermissionRequest;
           import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import java.util.ArrayList;
+          import java.util.Locale;
+
           public class MainActivity extends Activity {
               private WebView webView;
+              private TextToSpeech tts;
+              private SpeechRecognizer speechRecognizer;
+
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                       requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 101);
                   }
+
+                  tts = new TextToSpeech(this, status -> {
+                      if (status == TextToSpeech.SUCCESS) {
+                          tts.setLanguage(new Locale("tr", "TR"));
+                      }
+                  });
+
                   webView = new WebView(this);
                   setContentView(webView);
                   WebSettings s = webView.getSettings();
@@ -131,29 +157,128 @@ jobs:
                   s.setAllowContentAccess(true);
                   s.setAllowFileAccessFromFileURLs(true);
                   s.setAllowUniversalAccessFromFileURLs(true);
+
+                  webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
+
                   webView.setWebChromeClient(new WebChromeClient() {
                       @Override
                       public void onPermissionRequest(final PermissionRequest request) {
                           request.grant(request.getResources());
                       }
                   });
+
                   webView.setWebViewClient(new WebViewClient() {
                       @Override
                       public boolean shouldOverrideUrlLoading(WebView view, String url) {
                           if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
                               return false;
                           }
-                          try {
-                              Intent i = url.startsWith("intent:")
-                                  ? Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
-                                  : new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                              startActivity(i);
-                          } catch (Exception e) {}
+                          launchExternalUri(url);
                           return true;
                       }
                   });
+
                   webView.loadUrl("file:///android_asset/index.html");
               }
+
+              private void launchExternalUri(String uri) {
+                  try {
+                      Intent i = uri.startsWith("intent:")
+                          ? Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
+                          : new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+                      startActivity(i);
+                  } catch (Exception e) {}
+              }
+
+              public class AndroidBridge {
+                  @JavascriptInterface
+                  public void speak(String text, float rate, float pitch) {
+                      if (tts != null) {
+                          tts.setSpeechRate(rate);
+                          tts.setPitch(pitch);
+                          Bundle params = new Bundle();
+                          tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "JARVIS_ID");
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public void stopSpeaking() {
+                      if (tts != null) {
+                          tts.stop();
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public void openUri(String uri) {
+                      runOnUiThread(() -> launchExternalUri(uri));
+                  }
+
+                  @JavascriptInterface
+                  public void startListening() {
+                      runOnUiThread(() -> {
+                          try {
+                              if (speechRecognizer == null) {
+                                  speechRecognizer = SpeechRecognizer.createSpeechRecognizer(MainActivity.this);
+                                  speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                                      @Override public void onReadyForSpeech(Bundle params) {}
+                                      @Override public void onBeginningOfSpeech() {}
+                                      @Override public void onRmsChanged(float rmsdB) {}
+                                      @Override public void onBufferReceived(byte[] buffer) {}
+                                      @Override public void onEndOfSpeech() {}
+                                      @Override public void onError(int error) {
+                                          Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                                          intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                                          intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR");
+                                          try {
+                                              startActivityForResult(intent, 202);
+                                          } catch (Exception ex) {
+                                              webView.evaluateJavascript("if(window.onNativeSpeechError) window.onNativeSpeechError();", null);
+                                          }
+                                      }
+                                      @Override public void onResults(Bundle results) {
+                                          ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                                          if (matches != null && !matches.isEmpty()) {
+                                              String text = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
+                                              webView.evaluateJavascript("if(window.onNativeSpeechResult) window.onNativeSpeechResult('" + text + "');", null);
+                                          }
+                                      }
+                                      @Override public void onPartialResults(Bundle partialResults) {
+                                          ArrayList<String> matches = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                                          if (matches != null && !matches.isEmpty()) {
+                                              String text = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
+                                              webView.evaluateJavascript("if(window.onNativeSpeechPartial) window.onNativeSpeechPartial('" + text + "');", null);
+                                          }
+                                      }
+                                      @Override public void onEvent(int eventType, Bundle params) {}
+                                  });
+                              }
+                              Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                              intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                              intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR");
+                              intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+                              speechRecognizer.startListening(intent);
+                          } catch (Exception e) {
+                              Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                              intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                              intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR");
+                              try { startActivityForResult(intent, 202); } catch (Exception ex) {}
+                          }
+                      });
+                  }
+              }
+
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+                  if (requestCode == 202 && resultCode == RESULT_OK && data != null) {
+                      ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                      if (matches != null && !matches.isEmpty()) {
+                          String text = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
+                          webView.evaluateJavascript("if(window.onNativeSpeechResult) window.onNativeSpeechResult('" + text + "');", null);
+                      }
+                  }
+              }
+
               @Override
               public void onBackPressed() {
                   if (webView != null && webView.canGoBack()) {
@@ -161,6 +286,13 @@ jobs:
                   } else {
                       super.onBackPressed();
                   }
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (tts != null) { tts.stop(); tts.shutdown(); }
+                  if (speechRecognizer != null) { speechRecognizer.destroy(); }
+                  super.onDestroy();
               }
           }
           EOF
@@ -170,5 +302,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-APK
+          name: JARVIS-APK-V2
           path: android-project/app/build/outputs/apk/debug/app-debug.apk
