@@ -64,8 +64,8 @@ jobs:
                   applicationId "com.stark.jarvis"
                   minSdk 24
                   targetSdk 34
-                  versionCode 2
-                  versionName "2.0"
+                  versionCode 3
+                  versionName "3.0"
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -85,6 +85,13 @@ jobs:
               <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
               <queries>
                   <intent>
+                      <action android:name="android.intent.action.MAIN" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="https" />
+                  </intent>
+                  <intent>
                       <action android:name="android.speech.RecognitionService" />
                   </intent>
                   <intent>
@@ -99,6 +106,7 @@ jobs:
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
+                      android:windowSoftInputMode="adjustResize"
                       android:configChanges="orientation|screenSize|keyboardHidden">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -116,16 +124,21 @@ jobs:
           import android.content.pm.PackageManager;
           import android.net.Uri;
           import android.os.Bundle;
+          import android.provider.AlarmClock;
           import android.speech.RecognitionListener;
           import android.speech.RecognizerIntent;
           import android.speech.SpeechRecognizer;
           import android.speech.tts.TextToSpeech;
+          import android.speech.tts.UtteranceProgressListener;
           import android.webkit.JavascriptInterface;
           import android.webkit.PermissionRequest;
           import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import java.io.ByteArrayOutputStream;
+          import java.io.InputStream;
+          import java.nio.charset.StandardCharsets;
           import java.util.ArrayList;
           import java.util.Locale;
 
@@ -144,6 +157,15 @@ jobs:
                   tts = new TextToSpeech(this, status -> {
                       if (status == TextToSpeech.SUCCESS) {
                           tts.setLanguage(new Locale("tr", "TR"));
+                          tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                              @Override public void onStart(String utteranceId) {}
+                              @Override public void onDone(String utteranceId) {
+                                  runOnUiThread(() -> webView.evaluateJavascript("if(window.onNativeTtsDone) window.onNativeTtsDone();", null));
+                              }
+                              @Override public void onError(String utteranceId) {
+                                  runOnUiThread(() -> webView.evaluateJavascript("if(window.onNativeTtsDone) window.onNativeTtsDone();", null));
+                              }
+                          });
                       }
                   });
 
@@ -152,41 +174,62 @@ jobs:
                   WebSettings s = webView.getSettings();
                   s.setJavaScriptEnabled(true);
                   s.setDomStorageEnabled(true);
+                  s.setDatabaseEnabled(true);
                   s.setMediaPlaybackRequiresUserGesture(false);
                   s.setAllowFileAccess(true);
                   s.setAllowContentAccess(true);
-                  s.setAllowFileAccessFromFileURLs(true);
-                  s.setAllowUniversalAccessFromFileURLs(true);
 
                   webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
-
                   webView.setWebChromeClient(new WebChromeClient() {
                       @Override
                       public void onPermissionRequest(final PermissionRequest request) {
                           request.grant(request.getResources());
                       }
                   });
-
                   webView.setWebViewClient(new WebViewClient() {
                       @Override
                       public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                          if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
+                          if (url.startsWith("http://") || url.startsWith("https://")) {
                               return false;
                           }
-                          launchExternalUri(url);
+                          launchExternal(url, "");
                           return true;
                       }
                   });
 
-                  webView.loadUrl("file:///android_asset/index.html");
+                  try {
+                      InputStream is = getAssets().open("index.html");
+                      ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                      int nRead;
+                      byte[] data = new byte[4096];
+                      while ((nRead = is.read(data, 0, data.length)) != -1) {
+                          buffer.write(data, 0, nRead);
+                      }
+                      is.close();
+                      String html = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+                      webView.loadDataWithBaseURL("https://jarvis.stark.os/", html, "text/html", "UTF-8", null);
+                  } catch (Exception e) {
+                      webView.loadUrl("file:///android_asset/index.html");
+                  }
               }
 
-              private void launchExternalUri(String uri) {
+              private void launchExternal(String uri, String pkg) {
                   try {
-                      Intent i = uri.startsWith("intent:")
-                          ? Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
-                          : new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
-                      startActivity(i);
+                      if (pkg != null && !pkg.isEmpty()) {
+                          Intent launchIntent = getPackageManager().getLaunchIntentForPackage(pkg);
+                          if (launchIntent != null) {
+                              launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              startActivity(launchIntent);
+                              return;
+                          }
+                      }
+                      if (uri != null && !uri.isEmpty()) {
+                          Intent i = uri.startsWith("intent:")
+                              ? Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
+                              : new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+                          i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          startActivity(i);
+                      }
                   } catch (Exception e) {}
               }
 
@@ -197,7 +240,7 @@ jobs:
                           tts.setSpeechRate(rate);
                           tts.setPitch(pitch);
                           Bundle params = new Bundle();
-                          tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "JARVIS_ID");
+                          tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "JARVIS_UTTERANCE");
                       }
                   }
 
@@ -209,8 +252,23 @@ jobs:
                   }
 
                   @JavascriptInterface
-                  public void openUri(String uri) {
-                      runOnUiThread(() -> launchExternalUri(uri));
+                  public void openAppOrUri(String uri, String pkg) {
+                      runOnUiThread(() -> launchExternal(uri, pkg));
+                  }
+
+                  @JavascriptInterface
+                  public void setSystemAlarm(int hour, int minute) {
+                      runOnUiThread(() -> {
+                          try {
+                              Intent i = new Intent(AlarmClock.ACTION_SET_ALARM);
+                              i.putExtra(AlarmClock.EXTRA_HOUR, hour);
+                              i.putExtra(AlarmClock.EXTRA_MINUTES, minute);
+                              i.putExtra(AlarmClock.EXTRA_MESSAGE, "J.A.R.V.I.S. Alarm");
+                              i.putExtra(AlarmClock.EXTRA_SKIP_UI, true);
+                              i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              startActivity(i);
+                          } catch (Exception e) {}
+                      });
                   }
 
                   @JavascriptInterface
@@ -226,14 +284,7 @@ jobs:
                                       @Override public void onBufferReceived(byte[] buffer) {}
                                       @Override public void onEndOfSpeech() {}
                                       @Override public void onError(int error) {
-                                          Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                                          intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                                          intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR");
-                                          try {
-                                              startActivityForResult(intent, 202);
-                                          } catch (Exception ex) {
-                                              webView.evaluateJavascript("if(window.onNativeSpeechError) window.onNativeSpeechError();", null);
-                                          }
+                                          launchVoiceDialogFallback();
                                       }
                                       @Override public void onResults(Bundle results) {
                                           ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
@@ -258,12 +309,21 @@ jobs:
                               intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
                               speechRecognizer.startListening(intent);
                           } catch (Exception e) {
-                              Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                              intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                              intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR");
-                              try { startActivityForResult(intent, 202); } catch (Exception ex) {}
+                              launchVoiceDialogFallback();
                           }
                       });
+                  }
+              }
+
+              private void launchVoiceDialogFallback() {
+                  try {
+                      Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                      intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                      intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR");
+                      intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "J.A.R.V.I.S. Sizi Dinliyor...");
+                      startActivityForResult(intent, 202);
+                  } catch (Exception ex) {
+                      webView.evaluateJavascript("if(window.onNativeSpeechError) window.onNativeSpeechError();", null);
                   }
               }
 
@@ -281,11 +341,11 @@ jobs:
 
               @Override
               public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
-                      webView.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
+                  webView.evaluateJavascript("window.closeAnyOpenModal ? window.closeAnyOpenModal() : false", value -> {
+                      if (!"true".equals(value)) {
+                          runOnUiThread(() -> MainActivity.super.onBackPressed());
+                      }
+                  });
               }
 
               @Override
@@ -302,5 +362,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-APK-V2
+          name: JARVIS-MARK-X-FINAL
           path: android-project/app/build/outputs/apk/debug/app-debug.apk
